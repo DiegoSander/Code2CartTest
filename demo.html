@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Catálogo Demo • Cloudflare Pages + D1</title>
+  <style>
+    :root{
+      --bg:#0b0c10; --panel:#111217; --card:#171923; --muted:#a0a3ad; --text:#e9e9ef;
+      --accent:#7c5cff; --accent-2:#22c55e; --danger:#ef4444; --border:#262736;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial}
+    a{color:var(--accent);text-decoration:none}
+    .wrap{max-width:1100px;margin:0 auto;padding:20px}
+    header{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .brand{display:flex;gap:10px;align-items:center}
+    .brand h1{font-size:18px;margin:0}
+    .pill{background:var(--card);border:1px solid var(--border);padding:6px 10px;border-radius:999px;color:var(--muted)}
+    .searchbar{display:flex;gap:8px;width:100%;max-width:620px}
+    .searchbar input{flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--text)}
+    .searchbar button{padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer}
+    .searchbar button:disabled{opacity:.6;cursor:not-allowed}
+    .grid{display:grid;grid-template-columns:repeat( auto-fill, minmax(240px,1fr) );gap:14px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px}
+    .title{font-weight:600;font-size:15px}
+    .muted{color:var(--muted);font-size:12px}
+    .price{font-weight:700}
+    .row{display:flex;gap:8px;align-items:center;justify-content:space-between}
+    .qty{display:flex;gap:6px;align-items:center}
+    .qty input{width:64px;padding:6px 8px;border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--text)}
+    .btn{padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer}
+    .btn.primary{background:linear-gradient(180deg, var(--accent), #6245ff);border-color:#5b4cff}
+    .btn.success{background:linear-gradient(180deg, var(--accent-2), #1ea34e);border-color:#118d41}
+    .btn.danger{background:linear-gradient(180deg, var(--danger), #b91c1c);border-color:#991b1b}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    footer{display:flex;gap:12px;align-items:center;justify-content:center;margin:18px 0}
+    .pager button{padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer}
+    .pager .info{color:var(--muted);margin:0 8px}
+    .toast{position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;padding:10px 12px;border-radius:10px;border:1px solid #374151;box-shadow:0 8px 30px rgba(0,0,0,.35);opacity:0;transform:translateY(10px);transition:.25s}
+    .toast.show{opacity:1;transform:none}
+    .cart{position:fixed;top:16px;right:16px;background:var(--panel);border:1px solid var(--border);border-radius:14px;width:320px;max-height:70vh;overflow:auto;padding:12px;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+    .cart h3{margin:0 0 10px 0;font-size:15px}
+    .cart ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+    .cart li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--border);padding-bottom:6px}
+    .cart .muted{font-size:11px}
+    .cart .actions{display:flex;gap:8px;margin-top:10px}
+    .hide{display:none}
+    .badge{display:inline-block;padding:2px 8px;border:1px solid var(--border);border-radius:999px;font-size:11px;color:var(--muted)}
+    .rating{font-size:12px}
+    @media (max-width: 860px){ .cart{position:static;width:auto;max-height:none;margin-top:10px} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="pill">Catálogo</div>
+        <h1>Cloudflare Pages + D1</h1>
+      </div>
+      <div class="searchbar">
+        <input id="q" placeholder="Buscar por título/descrição..." />
+        <button id="btnSearch">Buscar</button>
+        <button id="btnClear" title="Limpar busca">Limpar</button>
+      </div>
+      <div><span id="totalBadge" class="badge">0 itens</span></div>
+    </header>
+
+    <div class="grid" id="grid"></div>
+
+    <footer class="pager">
+      <button id="prev">◀︎ Anterior</button>
+      <span class="info" id="pageInfo">página 1 de 1</span>
+      <button id="next">Próxima ▶︎</button>
+    </footer>
+
+    <aside class="cart" id="cart">
+      <h3>Carrinho</h3>
+      <ul id="cartList"></ul>
+      <div class="row">
+        <div class="muted">Total</div>
+        <div id="cartTotal" class="price">R$ 0,00</div>
+      </div>
+      <div class="actions">
+        <button id="btnCheckout" class="btn success">Finalizar compra</button>
+        <button id="btnClearCart" class="btn danger">Esvaziar</button>
+      </div>
+      <div class="muted" style="margin-top:8px">Dica: você pode comprar direto no card também.</div>
+    </aside>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+  // >>> API BASE ABSOLUTA PARA EVITAR CORS AO ABRIR LOCAL (file://)
+  // Altere para o seu domínio Pages se for diferente:
+  const API_BASE = 'https://catalogo-products.pages.dev';
+
+  const state = {
+    page: 1,
+    pageSize: 12,
+    total: 0,
+    q: '',
+    products: [],
+    cart: [] // {productId, title, unit, qty}
+  };
+
+  const els = {
+    grid: document.getElementById('grid'),
+    pageInfo: document.getElementById('pageInfo'),
+    prev: document.getElementById('prev'),
+    next: document.getElementById('next'),
+    q: document.getElementById('q'),
+    btnSearch: document.getElementById('btnSearch'),
+    btnClear: document.getElementById('btnClear'),
+    totalBadge: document.getElementById('totalBadge'),
+    toast: document.getElementById('toast'),
+    cartList: document.getElementById('cartList'),
+    cartTotal: document.getElementById('cartTotal'),
+    btnCheckout: document.getElementById('btnCheckout'),
+    btnClearCart: document.getElementById('btnClearCart'),
+  };
+
+  function brl(n){ try{ return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}catch{ return 'R$ '+Number(n).toFixed(2);} }
+  function showToast(msg){ els.toast.textContent = msg; els.toast.classList.add('show'); setTimeout(()=>els.toast.classList.remove('show'), 2500); }
+
+  async function load(){
+    const params = new URLSearchParams({ page: String(state.page), pageSize: String(state.pageSize) });
+    if (state.q) params.set('q', state.q);
+    const url = API_BASE + '/api/products?' + params.toString();
+    els.grid.innerHTML = '<div class="muted">Carregando...</div>';
+    try{
+      const r = await fetch(url);
+      const j = await r.json();
+      state.total = j?.meta?.total ?? 0;
+      state.products = Array.isArray(j?.products) ? j.products : [];
+      render();
+    }catch(e){
+      els.grid.innerHTML = '<div class="muted">Falha ao carregar produtos.</div>';
+      console.error(e);
+    }
+  }
+
+  function render(){
+    const totalPages = Math.max(1, Math.ceil(state.total / state.pageSize));
+    els.pageInfo.textContent = `página ${state.page} de ${totalPages}`;
+    els.totalBadge.textContent = `${state.total} itens`;
+
+    els.grid.innerHTML = state.products.map(p => {
+      const price = (p.price && typeof p.price === 'object') ? (p.price.final ?? p.price.price_final ?? 0) : (p.price_final ?? p.priceFinal ?? p.price ?? 0);
+      const stock = (p.stock && typeof p.stock === 'object') ? (p.stock.quantity ?? p.stock.stock_quantity ?? 0) : (p.stock_quantity ?? p.stockQuantity ?? 0);
+      const ratingAvg = (p.rating && typeof p.rating === 'object') ? (p.rating.average ?? 0) : (p.rating_average ?? 0);
+      const ratingCount = (p.rating && typeof p.rating === 'object') ? (p.rating.count ?? 0) : (p.rating_count ?? 0);
+      const safeTitle = (p.title ?? p.name ?? p.slug ?? p.id);
+      const pid = p.id;
+
+      return `
+        <div class="card" data-id="${pid}">
+          <div class="title">${safeTitle}</div>
+          <div class="muted">${p.category ?? ''} • ${p.brand ?? ''}</div>
+          <div class="row">
+            <div class="price">${brl(Number(price||0))}</div>
+            <div class="rating">⭐ ${Number(ratingAvg||0).toFixed(1)} <span class="muted">(${ratingCount})</span></div>
+          </div>
+          <div class="muted">Estoque: ${stock}</div>
+          <div class="row">
+            <div class="qty">
+              <label class="muted" for="q_${pid}">Qtd</label>
+              <input id="q_${pid}" type="number" min="1" value="1" ${stock<=0?'disabled':''}/>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn" ${stock<=0?'disabled':''} onclick="addToCart('${pid}', '${safeTitle.replace(/\"/g,'&quot;')}', ${Number(price||0)})">+ Carrinho</button>
+              <button class="btn primary" ${stock<=0?'disabled':''} onclick="buyNow('${pid}')">Comprar</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    els.prev.disabled = state.page <= 1;
+    const totalPages2 = Math.max(1, Math.ceil(state.total / state.pageSize));
+    els.next.disabled = state.page >= totalPages2;
+    renderCart();
+  }
+
+  // Carrinho
+  function addToCart(productId, title, unit){
+    const qtyInput = document.getElementById('q_'+productId);
+    const qty = Math.max(1, parseInt(qtyInput?.value||'1',10));
+    const existing = state.cart.find(i => i.productId === productId);
+    if (existing){ existing.qty += qty; } else { state.cart.push({ productId, title, unit, qty }); }
+    renderCart(); showToast('Item adicionado ao carrinho');
+  }
+
+  function renderCart(){
+    els.cartList.innerHTML = state.cart.length ? state.cart.map(i => `
+      <li>
+        <div>
+          <div>${i.title}</div>
+          <div class="muted">${i.productId} • ${i.qty} x ${brl(i.unit)}</div>
+        </div>
+        <div>${brl(i.unit * i.qty)}</div>
+      </li>
+    `).join('') : '<li class="muted">Sem itens.</li>';
+    const total = state.cart.reduce((s,i)=>s + i.unit*i.qty, 0);
+    els.cartTotal.textContent = brl(total);
+    els.btnCheckout.disabled = state.cart.length === 0;
+  }
+
+  els.btnClearCart.onclick = () => { state.cart = []; renderCart(); };
+
+  els.btnCheckout.onclick = async () => {
+    if (!state.cart.length) return;
+    const items = state.cart.map(i => ({ productId: i.productId, qty: i.qty }));
+    try{
+      const r = await fetch(API_BASE + '/api/orders', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ buyer:{ name:'Aluno Demo', email:'aluno@demo.com' }, items })
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.error || 'Falha na compra');
+      showToast('Pedido criado: ' + (j.id || j.order?.id || 'OK'));
+      state.cart = [];
+      renderCart();
+      await load(); // atualiza estoques na grade
+    }catch(e){
+      console.error(e); showToast('Erro: ' + e.message);
+    }
+  };
+
+  // Comprar rápido do card
+  async function buyNow(productId){
+    const qty = Math.max(1, parseInt(document.getElementById('q_'+productId)?.value||'1',10));
+    try{
+      const r = await fetch(API_BASE + '/api/orders', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ buyer:{ name:'Aluno Demo', email:'aluno@demo.com' }, items:[{ productId, qty }] })
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.error || 'Falha na compra');
+      showToast('Compra concluída! Pedido: ' + (j.id || j.order?.id || 'OK'));
+      await load();
+    }catch(e){ console.error(e); showToast('Erro: ' + e.message); }
+  }
+  window.buyNow = buyNow; // expõe p/ onclick no HTML gerado
+  window.addToCart = addToCart;
+
+  // Eventos gerais
+  els.prev.onclick = () => { if (state.page>1){ state.page--; load(); } };
+  els.next.onclick = () => {
+    const totalPages = Math.max(1, Math.ceil(state.total / state.pageSize));
+    if (state.page < totalPages){ state.page++; load(); }
+  };
+  els.btnSearch.onclick = () => { state.page = 1; state.q = els.q.value.trim(); load(); };
+  els.btnClear.onclick = () => { els.q.value=''; state.q=''; state.page=1; load(); };
+  els.q.addEventListener('keydown', e => { if (e.key==='Enter'){ state.page=1; state.q=els.q.value.trim(); load(); } });
+
+  // Inicialização
+  load();
+  </script>
+</body>
+</html>
